@@ -16,6 +16,33 @@ module cpu (
 );  // TO PRINT REGISTER VALUES IN TESTBENCH (YOU SHOULD NOT USE THIS)
   /***** Wire declarations *****/
 
+  wire [31:0] instruction;
+  wire [31:0] alu_operation;
+
+  wire [31:0] reg_file_read_dout1;
+  wire [31:0] reg_file_read_dout2;
+
+  wire [31:0] register_write_data;
+  wire [31:0] alu_in2_input;
+
+  wire [31:0] alu_output;
+
+  wire [31:0] imm_gen_ouput;
+
+  wire [31:0] dmem_output;
+
+  wire [31:0] mux_dmem_output;
+
+  wire alu_bcond_output;
+
+  wire control_unit_output [0:`CONTROL_UNIT_LINES_COUNT - 1];
+
+  wire [31:0] current_pc_address;
+  wire [31:0] next_pc_address;
+  wire [31:0] adjacent_pc_address;
+  wire [31:0] adder_offset_pc_address;
+  wire [31:0] branch_determined_pc_address;
+
   /***** Register declarations *****/
 
   // ---------- Update program counter ----------
@@ -23,16 +50,16 @@ module cpu (
   pc pc (
       .reset     (),  // input (Use reset to initialize PC. Initial value must be 0)
       .clk       (),  // input
-      .next_pc   (),  // input
-      .current_pc()   // output
+      .next_pc   (next_pc_address),  // input
+      .current_pc(current_pc_address)   // output
   );
 
   // ---------- Instruction Memory ----------
-  instruction_memory imem (
-      .reset(),  // input
-      .clk  (),  // input
-      .addr (),  // input
-      .dout ()   // output
+  instruction_memory imem(
+    .reset(),   // input
+    .clk(),     // input
+    .addr(current_pc_address),    // input
+    .dout(instruction)     // output
   );
 
   // ---------- Register File ----------
@@ -87,13 +114,60 @@ module cpu (
   );
 
   // ---------- Data Memory ----------
-  data_memory dmem (
-      .reset    (),  // input
-      .clk      (),  // input
-      .addr     (),  // input
-      .din      (),  // input
-      .mem_read (),  // input
-      .mem_write(),  // input
-      .dout     ()   // output
+  data_memory dmem(
+    .reset (),      // input
+    .clk (),        // input
+    .addr (alu_result),       // input
+    .din (reg_file_read_dout2),        // input
+    .mem_read (control_unit_output[`CONTROL_MEM_READ]),   // input
+    .mem_write (control_unit_output[`CONTROL_MEM_WRITE]),  // input
+    .dout (dmem_output)        // output
   );
+
+  mux32bit mux_register_write_data_select(
+    .mux_in_0(mux_dmem_output),  // Data memeory out
+    .mux_in_1(adjacent_pc_address),  // PC + 4
+    .sel(control_unit_output[`CONTROL_PC_TO_REG]),
+    .mux_out(register_write_data)  // to reg_file.rd_din
+  );
+
+  mux32bit mux_alu_in_2_select(
+    .mux_in_0(reg_file_read_dout2),  // reg_file.rs2_dout
+    .mux_in_1(imm_gen_ouput),  // imm_gen.imm_gen_out
+    .sel(control_unit_output[`CONTROL_ALU_SRC]),
+    .mux_out(alu_in2_input)  // to alu.alu_in_2
+  );
+
+  mux32bit mux_dmem_out_select(
+    .mux_in_0(alu_result),
+    .mux_in_1(dmem_output),
+    .sel(control_unit_output[`CONTROL_MEM_TO_REG]),
+    .mux_out(mux_dmem_output)
+  );
+
+  adder32bit adder_adjacent_pc_address(
+    .adder_in_0(current_pc_address),
+    .adder_in_1(32'h00000004),
+    .adder_out(adjacent_pc_address)
+  );
+
+  adder32bit adder_offset_pc_address(
+    .adder_in_0(current_pc_address),
+    .adder_in_1(imm_gen_ouput),
+    .adder_out(adder_offset_pc_address)
+  );
+
+  mux32bit mux_branch_select(
+    .mux_in_0(adjacent_pc_address),
+    .mux_in_1(adder_offset_pc_address),
+    .sel(control_unit_output[`CONTROL_JAL] | (control_unit_output[`CONTROL_BRANCH] & alu_bcond_output)),
+    .mux_out(branch_determined_pc_address)
+  );
+
+  mux32bit mux_alu_address_select(
+    .mux_in_0(branch_determined_pc_address),
+    .mux_in_1(alu_output),
+    .sel(control_unit_output[`CONTROL_JALR]),
+    .mux_out(current_pc_address)
+  )
 endmodule
