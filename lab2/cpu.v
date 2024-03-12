@@ -48,32 +48,32 @@ module cpu (
   // ---------- Update program counter ----------
   // PC must be updated on the rising edge (positive edge) of the clock.
   pc pc (
-      .reset     (),  // input (Use reset to initialize PC. Initial value must be 0)
-      .clk       (),  // input
+      .reset     (reset),  // input (Use reset to initialize PC. Initial value must be 0)
+      .clk       (clk),  // input
       .next_pc   (next_pc_address),  // input
       .current_pc(current_pc_address)   // output
   );
 
   // ---------- Instruction Memory ----------
   instruction_memory imem(
-    .reset(),   // input
-    .clk(),     // input
+    .reset(reset),   // input
+    .clk(clk),     // input
     .addr(current_pc_address),    // input
     .dout(instruction)     // output
   );
 
   // ---------- Register File ----------
   register_file reg_file (
-      .reset       (),          // input
-      .clk         (),          // input
-      .rs1         (),          // input
-      .rs2         (),          // input
-      .rd          (),          // input
-      .rd_din      (),          // input
-      .write_enable(),          // input
-      .rs1_dout    (),          // output
-      .rs2_dout    (),          // output
-      .print_reg   (print_reg)  //DO NOT TOUCH THIS
+    .reset (reset),        // input
+    .clk (clk),          // input
+    .rs1 (instruction[19:15]),          // input
+    .rs2 (instruction[24:20]),          // input
+    .rd (instruction[11:7]),           // input
+    .rd_din (register_write_data_out),       // input
+    .write_enable (control_unit_output[`CONTROL_REG_WRITE]), // input
+    .rs1_dout (reg_file_read_dout1),     // output
+    .rs2_dout (reg_file_read_dout2),     // output
+    .print_reg (print_reg)  //DO NOT TOUCH THIS
   );
 
 
@@ -115,8 +115,8 @@ module cpu (
 
   // ---------- Data Memory ----------
   data_memory dmem(
-    .reset (),      // input
-    .clk (),        // input
+    .reset (reset),      // input
+    .clk (clk),        // input
     .addr (alu_result),       // input
     .din (reg_file_read_dout2),        // input
     .mem_read (control_unit_output[`CONTROL_MEM_READ]),   // input
